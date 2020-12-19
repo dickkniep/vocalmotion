@@ -1,0 +1,22 @@
+Project is opgezet om de administratie van VM zo simpel mogelijk uit te kunnen voeren
+
+Op basis van een Excel sjabloon wordt per jaar een aparte spreadsheet gegenereerd.
+Daarin worden verschillende bladen aangemaakt:
+Blad 1: Leden
+Blad 2: V&W
+Blad 3: Balans
+Blad 4: rekeningschema
+
+Uitgangspunt is dat er géén kasgeld en alle transacties dus op de rekening staan.
+
+De Leden worden in principe vanuit de bankafschriften opgebouwd. Dus als er in het geheel niet betaald wordt
+is er ook geen mogelijkheid om dit te onderkennen.
+
+Alle bij- en afboekingen worden in Blad 2 Verlies & Winst rekening opgenomen.
+De boekingen worden gerubriceerd volgens het rekeningschema. Daarbij worden verschillende
+aannames gehanteerd:
+Alle bijboekingen worden als contributie geboekt, tenzij het bankrekening in het rekeningschema is opgenomen.
+
+Als er een spreadsheet van een vorig jaar bestaat, dan wordt die ingelezen en gebruikt als referentie
+voor het huidige jaar. Daarmee wordt bepaald wat de balans mutaties zijn.
+
