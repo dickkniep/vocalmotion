@@ -27,8 +27,8 @@ ING_mapping = [(0, 'transactiondate', lambda x: PARSER.parse(x)),
                (1, 'naam', None),
                (2, 'ownaccountnr', None),
                (3, 'accountnr', None),
-               (6, 'amount', lambda x: setamount(x)),
                (5, 'plusminus', lambda x: transplusminus(x)),
+               (6, 'amount', lambda x: setamount(x)),
                ]
 
 
@@ -45,6 +45,7 @@ class importline:
         for colnr, fieldname, conversion in parent.bank_sjabloon:
             setattr(self, fieldname, conversion(inlist[colnr]) if conversion else inlist[colnr])
         self.grootboekrekening = self.checkgrbrek()
+        self.amount = self.amount if self.plusminus == '+' else self.amount * -1
 
     def checkgrbrek(self):
         zwaarte = 100
