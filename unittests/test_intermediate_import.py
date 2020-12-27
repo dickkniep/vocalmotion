@@ -8,6 +8,11 @@ def test_importcsv():
     i_obj.process_importfile()
     assert(len(i_obj.rowlist) == 12)
 
-    i_obj.process_leden()
+    ledenws = i_obj.process_leden()
 
-    i_obj.process_transactions()
+    transws = i_obj.process_transactions()
+
+    debws = i_obj.proc_debiteuren()
+
+
+
