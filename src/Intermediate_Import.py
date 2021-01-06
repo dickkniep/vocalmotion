@@ -120,8 +120,11 @@ class importcsv:
             self.wb_vorigjaar = load_workbook(self.vorigjaar, keep_vba=True)
         self.verwerkingsjaar = verwerkingsjaar
         self.administratie = administratie
+        self.import_all = False
+
         if not isfile(administratie):
-            administratie = join(dirname(dirname(__file__)), 'resources', 'Administratie_sjabloon.xlsx')
+            administratie = join(dirname(dirname(__file__)), 'resources', 'Administratie_sjabl.xlsm')
+            self.import_all = True
         self.wb = load_workbook(administratie)
         common_ws = self.wb['Standaardwaarden']
         self.contributiebedrag = self.bldcontributie(common_ws)
@@ -196,13 +199,17 @@ class importcsv:
         transws = self.wb['Transacties']
         previous_value = None
         for newrow in self.rowlist:
-            accountcell = find_value([c for c in [newrow.accountnr, newrow.amount, newrow.transactiondate] if c], transws)
+            accountcell = None
+            if not self.import_all:
+                accountcell = find_value([c for c in [newrow.accountnr, newrow.amount, newrow.transactiondate] if c], transws)
             if not accountcell:
                 if previous_value and previous_value != newrow.ownaccount:
                     blankrow = 1
                 else:
                     blankrow = 0
                 addlist(transws, newrow.addtransrow(), blankrow=blankrow)
+            else:
+                print("Rij niet toegevoegd")
         return transws
 
     def calc_contributie_per_lid(self):
@@ -276,7 +283,51 @@ class importcsv:
         return debws
 
     def bouw_vanuit_vorigjaar(self):
-        pass
+        self.vorigjaar = load_workbook(self.vorigjaar)
+        for idx, row in enumerate(self.vorigjaar['Resultaten']):
+            if idx > 3:
+                if self.vorigjaar['Resultaten'][idx+1][1].value and \
+                        self.vorigjaar['Resultaten'][idx+1][1].value.lower() == 'resultaat':
+                    break
+                resultcell = find_value(self.vorigjaar['Resultaten'][idx+1][0].value, self.wb['Resultaten'])
+                if resultcell:
+                    self.wb['Resultaten'][resultcell.row][2].value = self.vorigjaar['Resultaten'][idx+1][3].value
+                else:
+                    addlist(self.wb['Resultaten'], [row[0].value, row[1].value, row[3].value])
+
+        for idx, row in enumerate(self.vorigjaar['Balans']):
+            if idx > 3:
+                if self.vorigjaar['Balans'][idx+1][1].value and \
+                        self.vorigjaar['Balans'][idx+1][1].value.lower() == 'totaal':
+                    break
+                self.wb['Balans'][idx+1][0].value = self.vorigjaar['Balans'][idx+1][0].value
+                self.wb['Balans'][idx+1][1].value = self.vorigjaar['Balans'][idx+1][1].value
+                self.wb['Balans'][idx+1][2].value = self.vorigjaar['Balans'][idx+1][3].value
+
+        write_idx = 4
+        for idx, row in enumerate(self.vorigjaar['Debiteuren']):
+            if idx > 4 and self.vorigjaar['Debiteuren'][idx+1][4].value is None:
+                write_idx += 1
+                self.wb['Debiteuren'][write_idx+1][0].value = self.vorigjaar['Debiteuren'][idx+1][0].value
+                self.wb['Debiteuren'][write_idx+1][1].value = self.vorigjaar['Debiteuren'][idx+1][1].value
+                self.wb['Debiteuren'][write_idx+1][2].value = self.vorigjaar['Debiteuren'][idx+1][2].value
+                self.wb['Debiteuren'][write_idx+1][3].value = self.vorigjaar['Debiteuren'][idx+1][3].value
+                self.wb['Debiteuren'][write_idx+1][4].value = self.vorigjaar['Debiteuren'][idx+1][4].value
+
+        for idx, row in enumerate(self.vorigjaar['Apparatuur']):
+            if self.vorigjaar['Apparatuur'][idx+1][0].value and \
+                    self.vorigjaar['Apparatuur'][idx+1][0].value.lower() == 'totaal':
+                break
+            self.wb['Apparatuur'][idx+1][0].value = self.vorigjaar['Apparatuur'][idx+1][0].value
+            if self.vorigjaar['Apparatuur'][idx+1][1].value:
+                try:
+                    h = int(self.vorigjaar['Apparatuur'][idx+1][1].value) + 1
+                except Exception:
+                    pass
+                else:
+                    self.wb['Apparatuur'][idx+1][1].value = h
+            self.wb['Apparatuur'][idx+1][2].value = self.vorigjaar['Apparatuur'][idx+1][2].value
+            self.wb['Apparatuur'][idx+1][4].value = self.vorigjaar['Apparatuur'][idx+1][4].value
 
     def save(self):
         self.wb.save(self.administratie)

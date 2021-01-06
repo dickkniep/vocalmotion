@@ -9,7 +9,7 @@ FILENAME = 'ADM%s.xlsx'
 
 if __name__ == '__main__':
     parser = ArgumentParser(description='Start Vocalmotion administratie')
-    parser.add_argument('-c', '--csv', type=str,
+    parser.add_argument('-c', '--csv', type=str, required=True,
                         help='Selecteer waar de import van de csv staat')
     parser.add_argument('-j', '--nieuwjaar', type=int,
                         help='Maak nieuw administratie aan voor dit jaar')
@@ -40,10 +40,12 @@ if __name__ == '__main__':
         jaar = datetime.now().year
     targetfile = join(args.locatie, FILENAME % jaar)
     vorigjaar = join(args.locatie, FILENAME % (jaar - 1))
-    if isfile(vorigjaar):
+    if isfile(vorigjaar) and not isfile(targetfile):
         vm_obj = importcsv(args.csv, administratie=targetfile, verwerkingsjaar=args.nieuwjaar, vorigjaar=vorigjaar)
         vm_obj.bouw_vanuit_vorigjaar()
+        import_all = True
     else:
+        import_all = False
         vm_obj = importcsv(args.csv, administratie=targetfile, verwerkingsjaar=args.nieuwjaar)
 
     vm_obj.process_importfile()
