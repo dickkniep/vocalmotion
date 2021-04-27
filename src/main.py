@@ -3,7 +3,7 @@ from os.path import isdir, dirname, join, isfile, expanduser
 from os import mkdir
 from argparse import ArgumentParser
 from datetime import datetime
-from Intermediate_Import import importcsv
+from Intermediate_Import import ImportCsv, ImportXls
 
 FILENAME = 'ADM%s.xlsx'
 
@@ -25,14 +25,21 @@ if __name__ == '__main__':
         else:
             sys.exit('Locatie voor opslag gespecificeerd, maar die bestaat niet')
 
-    if not args.csv.endswith('.csv'):
-        args.csv = args.csv + '.csv'
-    if args.csv and not isfile(args.csv):
-        fullcsv = join(args.locatie, args.csv)
-        if not isfile(fullcsv):
-            sys.exit('De CSV file %s werd niet gevonden' % args.csv)
-        else:
-            args.csv = fullcsv
+    new_in_filename = args.csv
+    fullcsv = args.csv
+    checklist = ('.csv', '.xlsx', 'xls')
+    idx = 0
+    for ext in checklist:
+        if not args.csv.endswith(checklist[idx]):
+            new_in_filename = args.csv + ext
+        if new_in_filename and not isfile(new_in_filename):
+            fullcsv = join(args.locatie, new_in_filename)
+            if not isfile(fullcsv):
+                continue
+        args.csv = fullcsv
+        break
+    else:
+        sys.exit('De CSV file of XLSX met de transacties %s werd niet gevonden in %s' % (args.csv, args.location) )
 
     if args.nieuwjaar:
         jaar = args.nieuwjaar
@@ -41,12 +48,15 @@ if __name__ == '__main__':
     targetfile = join(args.locatie, FILENAME % jaar)
     vorigjaar = join(args.locatie, FILENAME % (jaar - 1))
     if isfile(vorigjaar) and not isfile(targetfile):
-        vm_obj = importcsv(args.csv, administratie=targetfile, verwerkingsjaar=args.nieuwjaar, vorigjaar=vorigjaar)
+        vm_obj = ImportCsv(args.csv, administratie=targetfile, verwerkingsjaar=args.nieuwjaar, vorigjaar=vorigjaar)
         vm_obj.bouw_vanuit_vorigjaar()
         import_all = True
     else:
         import_all = False
-        vm_obj = importcsv(args.csv, administratie=targetfile, verwerkingsjaar=args.nieuwjaar)
+        if ext == '.csv':
+            vm_obj = ImportCsv(args.csv, administratie=targetfile, verwerkingsjaar=args.nieuwjaar)
+        else:
+            vm_obj = ImportXls(args.csv, administratie=targetfile, verwerkingsjaar=args.nieuwjaar)
 
     vm_obj.process_importfile()
     vm_obj.process_leden()

@@ -20,8 +20,8 @@ def transplusminus(invalue):
 
 
 def setamount(inamount):
-    if '.' not in inamount and  ',' not in inamount:
-        inamount = inamount[:-2] + '.' + inamount[-2:]
+    if '.' not in inamount and ',' not in inamount:
+        inamount = inamount + '.00'
     elif ',' in inamount:
         inamount = inamount.replace(',', '.')
     return Decimal(inamount)
@@ -36,27 +36,16 @@ ING_mapping = [(0, 'transactiondate', lambda x: PARSER.parse(x)),
                ]
 
 
-class importline:
-    def __init__(self, parent, inlist):
-        self.transactiondate = datetime.now()
-        self.parent = parent
-        if self.parent.verwerkingsjaar:
-            self.verwerkingsjaar = self.parent.verwerkingsjaar
-        else:
-            self.verwerkingsjaar = datetime.now().year
-        self.plusminus = '+'
-        self.amount = Decimal('0')
-        self.accountnr = '0'
-        self.naam = 'Onbekend'
-        self.ownaccountnr = None
-        if not parent.bank_sjabloon:
-            parent.bank_sjabloon = ING_mapping
-        for colnr, fieldname, conversion in parent.bank_sjabloon:
-            setattr(self, fieldname, conversion(inlist[colnr]) if conversion else inlist[colnr])
-        if self.transactiondate.year != self.verwerkingsjaar:
-            sys.exit('Er zijn transacties van een ander jaar aangetroffen')
-        self.grootboekrekening = self.checkowngrbrek()
-        self.amount = self.amount if self.plusminus == '+' else self.amount * -1
+class ImportBase:
+    transactiondate = datetime.now()
+    parent = None
+    verwerkingsjaar = None
+    plusminus = '+'
+    amount = Decimal('0')
+    accountnr = '0'
+    naam = 'Onbekend'
+    ownaccountnr = None
+    grootboekrekening = None
 
     def getkey(self):
         return str(self.ownaccountnr) + self.transactiondate.strftime('%Y%m%d')
@@ -111,7 +100,52 @@ class importline:
                 self.amount, self.naam]
 
 
-class importcsv:
+class ImportLineXLS(ImportBase):
+    def __init__(self, parent, inlist):
+        self.transactiondate = datetime.now()
+        self.parent = parent
+        if self.parent.verwerkingsjaar:
+            self.verwerkingsjaar = self.parent.verwerkingsjaar
+        else:
+            self.verwerkingsjaar = datetime.now().year
+        self.plusminus = '+'
+        self.amount = Decimal('0')
+        self.accountnr = '0'
+        self.naam = 'Onbekend'
+        self.ownaccountnr = None
+        if not parent.bank_sjabloon:
+            parent.bank_sjabloon = ING_mapping
+        for colnr, fieldname, conversion in parent.bank_sjabloon:
+            setattr(self, fieldname, conversion(inlist[colnr]) if conversion else inlist[colnr])
+        if self.transactiondate.year != self.verwerkingsjaar:
+            sys.exit('Er zijn transacties van een ander jaar aangetroffen')
+        self.grootboekrekening = self.checkowngrbrek()
+        self.amount = self.amount if self.plusminus == '+' else self.amount * -1
+
+
+class ImportLineCSV(ImportBase):
+    def __init__(self, parent, inlist):
+        self.transactiondate = datetime.now()
+        self.parent = parent
+        if self.parent.verwerkingsjaar:
+            self.verwerkingsjaar = self.parent.verwerkingsjaar
+        else:
+            self.verwerkingsjaar = datetime.now().year
+        self.plusminus = '+'
+        self.amount = Decimal('0')
+        self.accountnr = '0'
+        self.naam = 'Onbekend'
+        self.ownaccountnr = None
+        if not parent.bank_sjabloon:
+            parent.bank_sjabloon = ING_mapping
+        for colnr, fieldname, conversion in parent.bank_sjabloon:
+            setattr(self, fieldname, conversion(inlist[colnr]) if conversion else inlist[colnr])
+        if self.transactiondate.year != self.verwerkingsjaar:
+            sys.exit('Er zijn transacties van een ander jaar aangetroffen')
+        self.grootboekrekening = self.checkowngrbrek()
+        self.amount = self.amount if self.plusminus == '+' else self.amount * -1
+
+class ImportBase:
     def __init__(self, importfile, administratie: str, bank_sjabloon: list = None, verwerkingsjaar: int = 2018,
                  vorigjaar: str = None):
         self.rowlist = []
@@ -166,34 +200,13 @@ class importcsv:
                                                                              rekeningschemarij[6].value else None}}
         return rekeningschema
 
-    def process_importfile(self):
-        with open(self.importfile) as csv_file:
-            csv_reader = csv.reader(csv_file, delimiter=',')
-            for line_count, row in enumerate(csv_reader):
-                if line_count == 0:  # HEADER
-                    print('Import van csv bestand %s loopt' % csv_file)
-                else:  # DATALINES
-                    row_object = importline(self, row)
-                    if not self.verwerkingsjaar:
-                        self.verwerkingsjaar = row_object.verwerkingsjaar
-                    self.rowlist.append(row_object)
-        self.rowlist.sort(key=lambda x: x.getkey())
-
     def process_leden(self):
         ledenws = self.wb['Leden']
         for newrow in self.rowlist:
             accountcell = find_value(newrow.accountnr, ledenws, max_col=1)
-            if accountcell:
-                self.update_lid(newrow, list(ledenws[accountcell.row]))
-            elif newrow.is_contributie():
+            if not accountcell and newrow.is_contributie():
                 addlist(ledenws, newrow.addledenrow())
         return ledenws
-
-    def update_lid(self, newrow, ledenrow):
-        if isinstance(ledenrow[5].value, str):
-            ledenrow[5].value = PARSER.parse(ledenrow[5].value)
-        if not ledenrow[5].value or newrow.transactiondate > ledenrow[5].value:
-            ledenrow[5].value = newrow.transactiondate
 
     def process_transactions(self):
         transws = self.wb['Transacties']
@@ -331,3 +344,57 @@ class importcsv:
 
     def save(self):
         self.wb.save(self.administratie)
+
+
+class ImportXls(ImportBase):
+    def __init__(self, importfile, administratie: str, bank_sjabloon: list = None, verwerkingsjaar: int = 2018,
+                 vorigjaar: str = None):
+        super().__init__(importfile, administratie, bank_sjabloon, verwerkingsjaar, vorigjaar)
+
+    def process_importfile(self):
+        self.transactions_as_xls = load_workbook(self.importfile)
+        in_sheet = self.transactions_as_xls['in']
+        for line_count, row in enumerate(in_sheet.iter_rows(min_row=1, max_col=12, max_row=len(in_sheet))):
+            if line_count == 0:  # HEADER
+                print('Import van xls bestand %s loopt' % self.importfile)
+            else:  # DATALINES
+                row_object = ImportLineXLS(self, row)
+                if not self.verwerkingsjaar:
+                    self.verwerkingsjaar = row_object.verwerkingsjaar
+                self.rowlist.append(row_object)
+        self.rowlist.sort(key=lambda x: x.getkey())
+
+
+class ImportCsv(ImportBase):
+    def __init__(self, importfile, administratie: str, bank_sjabloon: list = None, verwerkingsjaar: int = 2018,
+                 vorigjaar: str = None):
+        super().__init__(importfile, administratie, bank_sjabloon, verwerkingsjaar, vorigjaar)
+
+    def process_import_lines(self, delim):
+        error = False
+        with open(self.importfile) as csv_file:
+            csv_reader = csv.reader(csv_file, delimiter=delim)
+            for line_count, row in enumerate(csv_reader):
+                if line_count == 0:  # HEADER
+                    print('Import van csv bestand %s loopt' % csv_file)
+                else:  # DATALINES
+                    try:
+                        row_object = ImportLineCSV(self, row)
+                    except Exception:
+                        error = True
+                        break
+                    if not self.verwerkingsjaar:
+                        self.verwerkingsjaar = row_object.verwerkingsjaar
+                    self.rowlist.append(row_object)
+        return error
+
+    def process_importfile(self):
+        delimiters = (',', ';', ':')
+        for delim in delimiters:
+            error = self.process_import_lines(delim)
+            if not error:
+                break
+        else:
+            sys.exit('Juiste delimiter voor csv kon niet worden gevonden, verwerking is onmogelijk')
+
+        self.rowlist.sort(key=lambda x: x.getkey())
