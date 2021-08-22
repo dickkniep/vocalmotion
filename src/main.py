@@ -1,5 +1,5 @@
 import sys
-from os.path import isdir, dirname, join, isfile, expanduser
+from os.path import isdir, dirname, join, isfile, curdir, basename
 from os import mkdir
 from argparse import ArgumentParser
 from datetime import datetime
@@ -18,7 +18,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     if not args.locatie:
-        args.locatie = expanduser(join('~', 'Documents', 'Vocalmotion administratie'))
+        args.locatie = curdir()
     if not isdir(args.locatie):
         if isdir(dirname(args.locatie)):
             mkdir(args.locatie)
@@ -41,25 +41,27 @@ if __name__ == '__main__':
     else:
         sys.exit('De CSV file of XLSX met de transacties %s werd niet gevonden in %s' % (args.csv, args.location) )
 
+    is_misschien_jaar = basename(curdir())
+    jaardirectory = False
+    try:
+        jaar = int(is_misschien_jaar)
+        jaardirectory=True
+    except ValueError:
+        jaar = datetime.now().year
     if args.nieuwjaar:
         jaar = args.nieuwjaar
-    else:
-        jaar = datetime.now().year
     targetfile = join(args.locatie, FILENAME % jaar)
-    vorigjaar = join(args.locatie, FILENAME % (jaar - 1))
-    if isfile(vorigjaar) and not isfile(targetfile):
-        vm_obj = ImportCsv(args.csv, administratie=targetfile, verwerkingsjaar=args.nieuwjaar, vorigjaar=vorigjaar)
-        vm_obj.bouw_vanuit_vorigjaar()
-        import_all = True
+    if jaardirectory:
+        vorigjaar = join(dirname(args.locatie), str(jaar -1), FILENAME % (jaar - 1))
     else:
-        import_all = False
-        if ext == '.csv':
-            vm_obj = ImportCsv(args.csv, administratie=targetfile, verwerkingsjaar=args.nieuwjaar)
-        else:
-            vm_obj = ImportXls(args.csv, administratie=targetfile, verwerkingsjaar=args.nieuwjaar)
+        vorigjaar = join(args.locatie, FILENAME % (jaar - 1))
+    if isfile(vorigjaar) and not isfile(targetfile):
+        vm_obj = ImportCsv(administratie=targetfile, verwerkingsjaar=jaar, vorigjaar=vorigjaar, importfile=args.csv)
+        vm_obj.bouw_vanuit_vorigjaar()
+    else:
+        vm_obj = ImportCsv(args.csv, administratie=targetfile, verwerkingsjaar=jaar)
 
-    vm_obj.process_importfile()
-    vm_obj.process_leden()
-    vm_obj.process_transactions()
-    vm_obj.proc_debiteuren()
+    if args.csv:
+        vm_obj.process_importfile()
+        vm_obj.process_leden()
     vm_obj.save()
